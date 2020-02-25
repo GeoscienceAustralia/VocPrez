@@ -6,6 +6,7 @@ from flask import g
 from SPARQLWrapper import SPARQLWrapper, JSON, BASIC
 import dateutil
 from model.concept import Concept
+from model.collection import Collection
 from collections import OrderedDict
 from helper import make_title, url_decode, cache_read, cache_write
 import logging
@@ -15,6 +16,7 @@ from time import sleep
 import helper as h
 import _config as config
 from data import source
+
 
 # Default to English if no DEFAULT_LANGUAGE in config
 if hasattr(config, 'DEFAULT_LANGUAGE:'):
@@ -206,7 +208,6 @@ WHERE {{
         print(sparql_query)
         members = Source.sparql_query(self.vocabulary.sparql_endpoint, sparql_query, self.vocabulary.sparql_username, self.vocabulary.sparql_password)
         print(members)
-        from model.collection import Collection
         return Collection(
             vocab_id=self.vocab_id,
             prefLabel=metadata[0]['label']['value'],
@@ -407,7 +408,7 @@ ORDER BY ?concept_preflabel'''.format(concept_scheme_uri=concept_scheme_uri,
 
     def get_object_class(self):
         #print('get_object_class uri = {}'.format(url_decode(self.request.values.get('uri'))))
-        
+       
         sparql_query = '''SELECT DISTINCT * 
 WHERE {{ 
     {{ GRAPH ?graph {{
@@ -742,7 +743,7 @@ WHERE  {{
         self._graph = Source.get_graph(self.vocabulary.sparql_endpoint, sparql_query, sparql_username=self.vocabulary.sparql_username, sparql_password=self.vocabulary.sparql_password)
         cache_write(self._graph, cache_file_name)
         return self._graph
-            
+
 
     @property
     def vocabulary(self):
@@ -764,18 +765,3 @@ WHERE  {{
         return self._vocabulary
     
             
-
-
-    # @staticmethod
-    # def sparql_query_in_memory_graph(vocab_id, sparql_query):
-    #     # get the graph from the pickled file
-    #     graph = Source.load_pickle_graph(vocab_id)
-    #
-    #     # put the query to the graph
-    #     for r in graph.query(sparql_query):
-    #
-    #
-    #
-    # @staticmethod
-    # def sparql_query_sparql_endpoint(vocab_id, sparql_query):
-    #     pass

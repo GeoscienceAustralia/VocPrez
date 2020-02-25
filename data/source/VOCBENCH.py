@@ -2,10 +2,10 @@ from data.source._source import Source
 import requests
 import json
 import _config as config
-from rdflib import Graph, Literal, URIRef
+from rdflib import Graph
 import os
 from helper import APP_DIR
-# from vocbench import Vocbench
+from vocbench import Vocbench
 
 global g  # Flask globals
 
@@ -271,7 +271,8 @@ class VOCBENCH(Source):
     def get_collection(self, uri):
         return NotImplementedError
 
-    def get_concept(self, uri):
+    def get_concept(self):
+        uri = self.request.values.get('uri')
         q = '''PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             PREFIX dct: <http://purl.org/dc/terms/>
             SELECT *
@@ -451,9 +452,10 @@ class VOCBENCH(Source):
             source=self,
         )
 
-    def get_concept_hierarchy(self, concept_scheme_uri):
+    def get_concept_hierarchy(self):
         # returns an ordered list of tuples, (hierarchy level, Concept URI, Concept prefLabel)
         s = VOCBENCH('x', self.request)._authed_request_object()
+        vocab = g.VOCABS[self.vocab_id]
         r = s.post(
             config.VB_ENDPOINT + '/SPARQL/evaluateQuery',
             data={
@@ -471,7 +473,7 @@ class VOCBENCH(Source):
                         FILTER (?cs = <{}>)
                     }}
                     GROUP BY ?c ?pl ?parent
-                    ORDER BY ?length ?parent ?pl'''.format(concept_scheme_uri),
+                    ORDER BY ?length ?parent ?pl'''.format(self.vocab_id),  # TODO: this needs to be a URI, not a token
                 'ctx_project': self.vocab_id
             }
         )
@@ -492,7 +494,7 @@ class VOCBENCH(Source):
                 test = c
                 if 'parent' not in c:
                     continue
-                if str(c['parent']['value']) == concept_scheme_uri:
+                if str(c['parent']['value']) == vocab.concept_scheme_uri:
                     hierarchy.append((
                         int(c['length']['value']),
                         c['c']['value'],
@@ -535,7 +537,7 @@ class VOCBENCH(Source):
         else:
             raise VbException('There was an error: ' + r.content.decode('utf-8'))
 
-    def get_object_class(self, uri):
+    def get_object_class(self):
         """Gets the class of the object.
 
         Classes restricted to being one of voaf:Vocabulary, skos:ConceptScheme, skos:Collection or skos:Collection
@@ -550,7 +552,7 @@ class VOCBENCH(Source):
             WHERE {{
                 <{}> a ?c .
             }}
-        '''.format(uri)
+        '''.format(self.request.values.get('uri'))
         s = VOCBENCH('x', self.request)._authed_request_object()
         r = s.post(
             config.VB_ENDPOINT + '/SPARQL/evaluateQuery',

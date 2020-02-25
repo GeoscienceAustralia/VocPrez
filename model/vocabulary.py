@@ -1,4 +1,4 @@
-from pyldapi import Renderer, View
+from pyldapi import Renderer, Profile
 from flask import Response, render_template, url_for
 from rdflib import Graph, URIRef, Literal, XSD, RDF
 from rdflib.namespace import DCTERMS, OWL, SKOS, Namespace, NamespaceManager
@@ -23,7 +23,7 @@ class Vocabulary:
             accessURL=None,
             downloadURL=None,
             sparql_endpoint=None, # A single Source object may define multiple endpoints with different credentials
-#            collection_uris=None,
+#           collection_uris=None,
             collections=None,
             sparql_username=None,
             sparql_password=None
@@ -59,8 +59,9 @@ class Vocabulary:
 
 class VocabularyRenderer(Renderer):
     def __init__(self, request, vocab):
-        self.views = self._add_dcat_view()
-        self.views.update(self._add_skos_view())
+        self.uri = request.base_url
+        self.profiles = self._add_dcat_profile()
+        self.profiles.update(self._add_skos_profile())
         self.navs = [
             # TODO: enable this link after the routes method
             # '<a href="' + url_for('routes.vocabulary', vocab_id=vocab.id) + '/collection/">Collections</a> |',
@@ -72,51 +73,53 @@ class VocabularyRenderer(Renderer):
         super().__init__(
             request,
             self.vocab.uri,
-            self.views,
-            'skos'
+            self.profiles,
+            'dcat'
         )
 
-    def _add_dcat_view(self):
+    def _add_dcat_profile(self):
         return {
-            'dcat': View(
-                'Dataset Catalogue Vocabulary (DCAT)',
-                'DCAT is an RDF vocabulary designed to facilitate interoperability between data catalogs published on '
-                'the Web.',
-                ['text/html', 'application/json'] + self.RDF_MIMETYPES,
-                'text/html',
+            'dcat': Profile(
+                label='https://www.w3.org/TR/vocab-dcat/',
+                comment='Dataset Catalogue Vocabulary (DCAT) is a W3C-authored RDF vocabulary designed to facilitate interoperability between data catalogs '
+                'published on the Web.',
+                mediatypes=['text/html', 'application/json'] + self.RDF_MEDIA_TYPES,
+                default_mediatype='text/html',
                 languages=['en'],  # default 'en' only for now
-                namespace='http://www.w3.org/ns/dcat#'
+                profile_uri='http://www.w3.org/ns/dcat#'
             )
         }
 
-    def _add_skos_view(self):
+    def _add_skos_profile(self):
         return {
-            'skos': View(
-                'Simple Knowledge Organization System (SKOS)',
-                'SKOS provides a standard way to represent knowledge organization systems using the Resource Description Framework (RDF). '
-                'Encoding this information in RDF allows it to be passed between computer applications in an interoperable way.',
-                ['text/html', 'application/json'] + self.RDF_MIMETYPES,
-                'text/html',
+            'skos': Profile(
+                label='https://www.w3.org/TR/skos-reference/',
+                comment='Simple Knowledge Organization System (SKOS)is a W3C-authored, common data model for sharing and linking knowledge organization systems '
+                'via the Web.',
+                mediatypes=['text/html', 'application/json'] + self.RDF_MEDIA_TYPES,
+                default_mediatype='text/html',
                 languages=['en'],  # default 'en' only for now
-                namespace='http://www.w3.org/2004/02/skos/core#'
+                profile_uri='http://www.w3.org/2004/02/skos/core#'
             )
         }
 
     def render(self):
-        if self.view == 'alternates':
-            if self.format == 'text/html':
-                return self._render_alternates_view_html({'title': 'Alternates View of ' + self.vocab.title, 'name': self.vocab.title})
-            return self._render_alternates_view()
-        elif self.view == 'dcat':
-            if self.format in Renderer.RDF_SERIALIZER_MAP:
+        # try returning alt profile
+        response = super().render()
+        if response is not None:
+            return response
+        elif self.profile == 'dcat':
+            if self.mediatype in Renderer.RDF_SERIALIZER_TYPES_MAP:
                 return self._render_dcat_rdf()
             else:
                 return self._render_dcat_html()
-        elif self.view == 'skos':
-            if self.format in Renderer.RDF_SERIALIZER_MAP:
+        elif self.profile == 'skos':
+            if self.mediatype in Renderer.RDF_SERIALIZER_TYPES_MAP:
                 return self._render_skos_rdf()
-            else:
-                return self._render_skos_html()
+            # ===================================================================
+            # else:
+            #     return self._render_skos_html()
+            # ===================================================================
 
     def _render_dcat_rdf(self):
         # get vocab RDF
@@ -160,37 +163,21 @@ class VocabularyRenderer(Renderer):
             g.add((s, VOID.sparqlEndpoint, URIRef(self.vocab.sparql_endpoint)))
 
         # serialise in the appropriate RDF format
-        if self.format in ['application/rdf+json', 'application/json']:
-            return Response(g.serialize(format='json-ld'), mimetype=self.format)
+        if self.mediatype in ['application/rdf+json', 'application/json']:
+            return Response(g.serialize(format='json-ld'), mimetype=self.mediatype)
         else:
-            return Response(g.serialize(format=self.format), mimetype=self.format)
+            return Response(g.serialize(format=self.mediatype), mimetype=self.mediatype)
 
     def _render_skos_rdf(self):
         # get vocab RDF
         g = self.vocab.source.graph
 
         # serialise in the appropriate RDF format
-        if self.format in ['application/rdf+json', 'application/json']:
-            return Response(g.serialize(format='json-ld'), mimetype=self.format)
+        if self.mediatype in ['application/rdf+json', 'application/json']:
+            return Response(g.serialize(format='json-ld'), mimetype=self.mediatype)
         else:
-            return Response(g.serialize(format=self.format), mimetype=self.format)
+            return Response(g.serialize(format=self.mediatype), mimetype=self.mediatype)
 
-    def _render_skos_html(self):
-        _template_context = {
-            'uri': self.uri,
-            'vocab': self.vocab,
-            'navs': self.navs,
-            'title': 'Voc: ' + self.vocab.title,
-            'config': config
-        }
-
-        return Response(
-            render_template(
-                'vocabulary.html',
-                **_template_context
-            ),
-            headers=self.headers
-        )
 
     def _render_dcat_html(self):
         _template_context = {
@@ -203,7 +190,7 @@ class VocabularyRenderer(Renderer):
 
         return Response(
             render_template(
-                'vocabulary_dcat.html',
+                'vocabulary.html',
                 **_template_context
             ),
             headers=self.headers

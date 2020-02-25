@@ -1,7 +1,7 @@
-from pyldapi import Renderer, View
-from flask import Response, render_template, g
+from pyldapi import Renderer, Profile
+from flask import Response, render_template
 from rdflib import Graph
-
+from flask import g
 
 class Collection:
     def __init__(
@@ -21,7 +21,7 @@ class Collection:
 
 class CollectionRenderer(Renderer):
     def __init__(self, request, collection):
-        self.views = self._add_skos_view()
+        self.profiles = self._add_skos_view()
         self.navs = []  # TODO: add in other nav items for Collection
 
         self.collection = collection
@@ -29,28 +29,31 @@ class CollectionRenderer(Renderer):
         super().__init__(
             request,
             request.values.get('uri'),
-            self.views,
+            self.collection.uri,
+            self.profiles,
             'skos'
         )
 
     def _add_skos_view(self):
         return {
-            'skos': View(
-                'Simple Knowledge Organization System (SKOS)',
-                'SKOS is a W3C recommendation designed for representation of thesauri, classification schemes, '
+            'skos': Profile(
+                label='https://www.w3.org/TR/skos-reference/',
+                comment='Simple Knowledge Organization System (SKOS) is a W3C recommendation designed for representation of thesauri, classification schemes, '
                 'taxonomies, subject-heading systems, or any other type of structured controlled vocabulary.',
-                ['text/html', 'application/json'] + self.RDF_MIMETYPES,
-                'text/html',
+                mediatypes=['text/html', 'application/json'] + self.RDF_MEDIA_TYPES,
+                default_mediatype='text/html',
                 languages=['en'],  # default 'en' only for now
-                namespace='http://www.w3.org/2004/02/skos/core#'
+                profile_uri='http://www.w3.org/2004/02/skos/core#'
             )
         }
 
     def render(self):
-        if self.view == 'alternates':
-            return self._render_alternates_view()
-        elif self.view == 'skos':
-            if self.format in Renderer.RDF_MIMETYPES:
+        # try returning alt profile
+        response = super().render()
+        if response is not None:
+            return response
+        elif self.profile == 'skos':
+            if self.mediatype in Renderer.RDF_MEDIA_TYPES:
                 return self._render_skos_rdf()
             else:
                 return self._render_skos_html()
@@ -58,13 +61,13 @@ class CollectionRenderer(Renderer):
     def _render_skos_rdf(self):
         # get Collection RDF
         # TODO: re-assemble RDF from Concept object
-        g = Graph()
+        graph = Graph()
 
         # serialise in the appropriate RDF format
-        if self.format in ['application/rdf+json', 'application/json']:
-            return g.serialize(format='json-ld')
+        if self.mediatype in ['application/rdf+json', 'application/json']:
+            return graph.serialize(format='json-ld')
         else:
-            return g.serialize(format=self.format)
+            return graph.serialize(format=self.mediatype)
 
     def _render_skos_html(self):
         _template_context = {
