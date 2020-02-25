@@ -21,7 +21,7 @@ class Collection:
 
 class CollectionRenderer(Renderer):
     def __init__(self, request, collection):
-        self.profiles = self._add_skos_view()
+        self.profiles = self._add_skos_profile()
         self.navs = []  # TODO: add in other nav items for Collection
 
         self.collection = collection
@@ -34,7 +34,7 @@ class CollectionRenderer(Renderer):
             'skos'
         )
 
-    def _add_skos_view(self):
+    def _add_skos_profile(self):
         return {
             'skos': Profile(
                 label='https://www.w3.org/TR/skos-reference/',
@@ -43,7 +43,7 @@ class CollectionRenderer(Renderer):
                 mediatypes=['text/html', 'application/json'] + self.RDF_MEDIA_TYPES,
                 default_mediatype='text/html',
                 languages=['en'],  # default 'en' only for now
-                profile_uri='http://www.w3.org/2004/02/skos/core#'
+                profile_uri='http://www.w3.org/2004/02/skos/core#',
             )
         }
 

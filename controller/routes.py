@@ -9,8 +9,9 @@ from data.source import Source
 from data.source.VOCBENCH import VbException
 import json
 from pyldapi import Renderer
-import controller.sparql_endpoint_functions
+
 from rdflib.namespace import SKOS
+from controller import sparql_endpoint_functions
 import datetime
 import logging
 import helper
@@ -195,14 +196,15 @@ def concepts(vocab_id):
     end = start + per_page
     concepts = concepts[start:end]
 
+ 
     test = SkosRegisterRenderer(
-        request,
-        [],
-        concepts,
-        g.VOCABS[vocab_id].title + ' concepts',
-        total,
-        search_query=query,
+        request=request,
+        navs=[],
+        members=concepts,
+        register_item_type_string=g.VOCABS[vocab_id].title + ' concepts',
+        total=total,
         search_enabled=True,
+        search_query=query,
         vocabulary_url=[request.url_root + 'vocabulary/' + vocab_id],
         vocab_id=vocab_id
     )
@@ -411,13 +413,13 @@ def endpoint():
             if 'CONSTRUCT' in query:
                 format_mimetype = 'text/turtle'
                 return Response(
-                    controller.sparql_endpoint_functions.sparql_query(query, format_mimetype=format_mimetype),
+                    sparql_endpoint_functions.sparql_query(query, format_mimetype=format_mimetype),
                     status=200,
                     mimetype=format_mimetype
                 )
             else:
                 return Response(
-                    controller.sparql_endpoint_functions.sparql_query(query, format_mimetype),
+                    sparql_endpoint_functions.sparql_query(query, format_mimetype),
                     status=200
                 )
         except ValueError as e:
@@ -446,9 +448,9 @@ def endpoint():
             '''
             query = request.args.get('query')
             if 'CONSTRUCT' in query:
-                acceptable_mimes = [x for x in Renderer.RDF_MIMETYPES]
+                acceptable_mimes = [x for x in Renderer.RDF_MEDIA_TYPES]
                 best = request.accept_mimetypes.best_match(acceptable_mimes)
-                query_result = controller.sparql_endpoint_functions.sparql_query(query, format_mimetype=best)
+                query_result = sparql_endpoint_functions.sparql_query(query, format_mimetype=best)
                 file_ext = {
                     'text/turtle': 'ttl',
                     'application/rdf+xml': 'rdf',
@@ -465,7 +467,7 @@ def endpoint():
                     }
                 )
             else:
-                query_result = controller.sparql_endpoint_functions.sparql_query(query)
+                query_result = sparql_endpoint_functions.sparql_query(query)
                 return Response(query_result, status=200, mimetype='application/sparql-results+json')
         else:
             # SPARQL Service Description
@@ -478,17 +480,17 @@ def endpoint():
             (X)HTML by way of RDFa, and should use content negotiation if available in other RDF representations.
             '''
 
-            acceptable_mimes = [x for x in Renderer.RDF_MIMETYPES] + ['text/html']
+            acceptable_mimes = [x for x in Renderer.RDF_MEDIA_TYPES] + ['text/html']
             best = request.accept_mimetypes.best_match(acceptable_mimes)
             if best == 'text/html':
                 # show the SPARQL query form
                 return redirect(url_for('routes.sparql'))
             elif best is not None:
-                for item in Renderer.RDF_MIMETYPES:
+                for item in Renderer.RDF_MEDIA_TYPES:
                     if item == best:
                         rdf_format = best
                         return Response(
-                            controller.sparql_endpoint_functions.get_sparql_service_description(
+                            sparql_endpoint_functions.get_sparql_service_description(
                                 rdf_format=rdf_format
                             ),
                             status=200,
