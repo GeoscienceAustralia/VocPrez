@@ -1,3 +1,5 @@
+# NOTE: this copy of the VocPrez codebase is now inactive, please see the active codebase at https://github.com/RDFLib/VocPrez/.
+
 # VocPrez
 A read-only web delivery system for Simple Knowledge Organization System (SKOS)-formulated RDF vocabularies.
 
